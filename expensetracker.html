@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22:%22Family%20Budget%20Tracker%22,%22short_name%22:%22Budget%20Tracker%22,%22start_url%22:%22./%22,%22display%22:%22standalone%22,%22background_color%22:%22%23f8f9fa%22,%22theme_color%22:%22%230d6efd%22,%22icons%22:%5B%7B%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20100%20100%27%3E%3Crect%20width=%27100%27%20height=%27100%27%20fill=%27%230d6efd%27/%3E%3Ctext%20x=%2750%27%20y=%2760%27%20font-size=%2760%27%20text-anchor=%27middle%27%20fill=%27white%27%3E$%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22%7D%5D%7D">
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Budget Tracker</title> 
+    <button id="installBtn" class="btn btn-success" style="display:none;">
+        <i class="fas fa-download me-1"></i> Install App
+</button>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" xintegrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif; /* Using Inter as a nice default */
+            background-color: #f8f9fa;
+            padding-bottom: 70px; /* Space for fixed bottom nav */
+        }
+        .view {
+            display: none; /* Hide all views by default */
+        }
+        .view.active {
+            display: block; /* Show active view */
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030; /* Ensure it's above other content */
+        }
+        .bottom-nav .nav-link {
+            border-radius: 0.5rem; /* Rounded corners for nav items */
+        }
+        .bottom-nav .nav-link.active {
+            background-color: #0d6efd; /* Bootstrap primary color */
+            color: white !important;
+        }
+        .bottom-nav .nav-link:hover {
+            background-color: #e9ecef;
+        }
+        .card {
+            border-radius: 0.75rem; /* Rounded cards */
+        }
+        .btn {
+            border-radius: 0.5rem; /* Rounded buttons */
+        }
+        .form-control, .form-select {
+            border-radius: 0.5rem; /* Rounded form elements */
+        }
+        #notificationArea {
+            position: fixed;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1050; /* High z-index for notifications */
+            min-width: 300px;
+            text-align: center;
+        }
+        .modal-content {
+            border-radius: 0.75rem;
+        }
+        .chart-container {
+            height: 300px; /* Default height for charts */
+            margin-bottom: 1rem;
+        }
+        @media (min-width: 768px) { /* Medium devices and up */
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .table th, .table td {
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <header class="bg-primary text-white p-3 shadow-sm sticky-top">
+        <h1 class="text-center h3 mb-0">Family Budget Tracker</h1>
+    </header>
+
+    <div id="notificationArea"></div>
+
+    <main class="container mt-4">
+        <div id="dashboardView" class="view active">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2 class="h4 text-primary mb-0">Dashboard</h2>
+                        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#expenseModal" onclick="prepareExpenseModal()">
+                            <i class="fas fa-plus-circle me-1"></i> Add Expense
+                        </button>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title text-muted">This Month's Spending</h5>
+                                    <p class="card-text fs-4 fw-bold text-primary" id="totalExpensesThisMonth">0.00</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title text-muted" id="activeBudgetName">Monthly Budget</h5>
+                                    <p class="card-text text-secondary mb-1" id="activeBudgetAmount">Target: 0.00</p>
+                                    <div class="progress" style="height: 20px;">
+                                        <div id="activeBudgetProgress" class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h3 class="h5 text-primary mb-3">Recent Expenses</h3>
+                    <ul class="list-group list-group-flush" id="recentExpensesList">
+                        <li class="list-group-item text-muted">No recent expenses.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div id="expensesView" class="view">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center mb-3 gap-2">
+                        <h2 class="h4 text-primary mb-0">All Expenses</h2>
+                        <div class="d-flex gap-2">
+                             <button class="btn btn-info btn-sm" id="toggleFiltersBtn">
+                                <i class="fas fa-filter me-1"></i> Show Filters
+                            </button>
+                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#expenseModal" onclick="prepareExpenseModal()">
+                                <i class="fas fa-plus-circle me-1"></i> Add New
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="filtersContainer" class="mb-3 p-3 bg-light rounded shadow-sm" style="display: none;">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <input type="text" id="searchTerm" class="form-control form-control-sm" placeholder="Search...">
+                            </div>
+                            <div class="col-md-4">
+                                <select id="filterCategory" class="form-select form-select-sm"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <select id="filterMember" class="form-select form-select-sm"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="date" id="filterDateStart" class="form-control form-control-sm" title="Start Date">
+                            </div>
+                            <div class="col-md-4">
+                                <input type="date" id="filterDateEnd" class="form-control form-control-sm" title="End Date">
+                            </div>
+                            <div class="col-md-4">
+                                <button id="clearFiltersBtn" class="btn btn-outline-secondary btn-sm w-100">Clear Filters</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Member</th>
+                                    <th class="text-end">Amount</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expensesTableBody">
+                                </tbody>
+                        </table>
+                    </div>
+                    <p id="noExpensesMessage" class="text-muted text-center mt-3" style="display:none;">No expenses found.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="manageView" class="view">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="h5 text-primary mb-0"><i class="fas fa-tags me-2 text-info"></i>Manage Categories</h3>
+                        <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal" onclick="prepareCategoryModal()">
+                            <i class="fas fa-plus me-1"></i> Add Category
+                        </button>
+                    </div>
+                    <ul id="categoriesList" class="list-group list-group-flush"></ul>
+                </div>
+            </div>
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="h5 text-primary mb-0"><i class="fas fa-users me-2 text-success"></i>Manage Members</h3>
+                        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#memberModal" onclick="prepareMemberModal()">
+                            <i class="fas fa-plus me-1"></i> Add Member
+                        </button>
+                    </div>
+                    <ul id="membersList" class="list-group list-group-flush"></ul>
+                </div>
+            </div>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="h5 text-primary mb-0"><i class="fas fa-chart-line me-2 text-warning"></i>Manage Budgets</h3>
+                        <button class="btn btn-warning btn-sm text-dark" data-bs-toggle="modal" data-bs-target="#budgetModal" onclick="prepareBudgetModal()">
+                            <i class="fas fa-plus me-1"></i> Add Budget
+                        </button>
+                    </div>
+                    <ul id="budgetsList" class="list-group list-group-flush"></ul>
+                </div>
+            </div>
+        </div>
+
+        <div id="reportsView" class="view">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h4 text-primary mb-4"><i class="fas fa-chart-pie me-2 text-purple"></i>Reports & Visualizations</h2>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="reportType" class="form-label">Report Type:</label>
+                            <select id="reportType" class="form-select form-select-sm">
+                                <option value="category">By Category</option>
+                                <option value="member">By Member</option>
+                                <option value="time_trend">Spending Trend</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="reportTimePeriod" class="form-label">Time Period:</label>
+                            <select id="reportTimePeriod" class="form-select form-select-sm">
+                                <option value="this_week">This Week</option>
+                                <option value="last_week">Last Week</option>
+                                <option value="this_month" selected>This Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="this_year">This Year</option>
+                                <option value="last_year">Last Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="reportCustomDateRange" class="row g-3 mb-4" style="display: none;">
+                        <div class="col-md-6">
+                            <label for="reportStartDate" class="form-label">Start Date:</label>
+                            <input type="date" id="reportStartDate" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="reportEndDate" class="form-label">End Date:</label>
+                            <input type="date" id="reportEndDate" class="form-control form-control-sm">
+                        </div>
+                    </div>
+                    <div id="chartContainerWrapper" class="chart-container bg-light p-2 rounded">
+                        <canvas id="reportsChart"></canvas>
+                    </div>
+                     <p id="noReportDataMessage" class="text-muted text-center mt-3" style="display:none;">No data available for this report.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="settingsView" class="view">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h4 text-primary mb-4"><i class="fas fa-cog me-2 text-secondary"></i>Settings</h2>
+                    <div class="mb-4">
+                        <h5 class="mb-2">Export Data</h5>
+                        <p class="text-muted small">Download all your data as a JSON file.</p>
+                        <button id="exportDataBtn" class="btn btn-primary btn-sm">
+                            <i class="fas fa-download me-1"></i> Export All Data
+                        </button>
+                    </div>
+                    <hr>
+                    <div>
+                        <h5 class="mb-2">Import Data</h5>
+                        <p class="text-muted small">Import data from a JSON file (previously exported from this app).</p>
+                        <input type="file" id="importFile" class="form-control form-control-sm mb-2" accept=".json">
+                        <button id="importDataBtn" class="btn btn-success btn-sm">
+                            <i class="fas fa-upload me-1"></i> Import Data File
+                        </button>
+                        <p class="text-muted small mt-1">Note: This will add new items. Existing items with the same ID are skipped.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <nav class="navbar navbar-expand navbar-light bg-light border-top bottom-nav shadow-lg">
+        <div class="container-fluid">
+            <ul class="navbar-nav nav-fill w-100">
+                <li class="nav-item">
+                    <a class="nav-link text-center active" href="#" data-view="dashboardView"><i class="fas fa-home d-block mb-1"></i><small>Dashboard</small></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-center" href="#" data-view="expensesView"><i class="fas fa-list-alt d-block mb-1"></i><small>Expenses</small></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-center" href="#" data-view="manageView"><i class="fas fa-dollar-sign d-block mb-1"></i><small>Manage</small></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-center" href="#" data-view="reportsView"><i class="fas fa-chart-bar d-block mb-1"></i><small>Reports</small></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-center" href="#" data-view="settingsView"><i class="fas fa-cog d-block mb-1"></i><small>Settings</small></a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="modal fade" id="expenseModal" tabindex="-1" aria-labelledby="expenseModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="expenseModalLabel">Add Expense</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="expenseForm">
+                        <input type="hidden" id="expenseId">
+                        <div class="mb-3">
+                            <label for="expenseAmount" class="form-label">Amount</label>
+                            <input type="number" class="form-control" id="expenseAmount" step="0.01" required>
+                            <div class="invalid-feedback">Please enter a valid amount.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="expenseCategory" class="form-label">Category</label>
+                            <select class="form-select" id="expenseCategory" required></select>
+                            <div class="invalid-feedback">Please select a category.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="expenseMember" class="form-label">Member</label>
+                            <select class="form-select" id="expenseMember" required></select>
+                             <div class="invalid-feedback">Please select a member.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="expenseDate" class="form-label">Date</label>
+                            <input type="date" class="form-control" id="expenseDate" required>
+                            <div class="invalid-feedback">Please select a date.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="expenseDescription" class="form-label">Description (Optional)</label>
+                            <input type="text" class="form-control" id="expenseDescription">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveExpenseBtn">Save Expense</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="categoryModalLabel">Add Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="categoryForm">
+                        <input type="hidden" id="categoryId">
+                        <div class="mb-3">
+                            <label for="categoryName" class="form-label">Category Name</label>
+                            <input type="text" class="form-control" id="categoryName" required>
+                            <div class="invalid-feedback">Category name is required.</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveCategoryBtn">Save Category</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="memberModal" tabindex="-1" aria-labelledby="memberModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="memberModalLabel">Add Member</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="memberForm">
+                        <input type="hidden" id="memberId">
+                        <div class="mb-3">
+                            <label for="memberName" class="form-label">Member Name</label>
+                            <input type="text" class="form-control" id="memberName" required>
+                            <div class="invalid-feedback">Member name is required.</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveMemberBtn">Save Member</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="budgetModal" tabindex="-1" aria-labelledby="budgetModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="budgetModalLabel">Add Budget</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="budgetForm">
+                        <input type="hidden" id="budgetId">
+                        <div class="mb-3">
+                            <label for="budgetName" class="form-label">Budget Name (Optional)</label>
+                            <input type="text" class="form-control" id="budgetName">
+                        </div>
+                        <div class="mb-3">
+                            <label for="budgetAmount" class="form-label">Amount</label>
+                            <input type="number" class="form-control" id="budgetAmount" step="0.01" required>
+                            <div class="invalid-feedback">Please enter a valid amount.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="budgetCategory" class="form-label">Category</label>
+                            <select class="form-select" id="budgetCategory" required>
+                                <option value="all">Overall (All Categories)</option>
+                            </select>
+                             <div class="invalid-feedback">Please select a category.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="budgetPeriod" class="form-label">Period</label>
+                            <select class="form-select" id="budgetPeriod" required>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly" selected>Monthly</option>
+                                <option value="yearly">Yearly</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                            <div class="invalid-feedback">Please select a period.</div>
+                        </div>
+                        <div id="budgetCustomDateRange" class="row g-3 mb-3" style="display: none;">
+                            <div class="col-md-6">
+                                <label for="budgetStartDate" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="budgetStartDate">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="budgetEndDate" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="budgetEndDate">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveBudgetBtn">Save Budget</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmModalLabel">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmModalMessage">Are you sure?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="confirmModalBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <script>
+        // --- App State & Initialization ---
+        let expenses = [];
+        let categories = [];
+        let members = [];
+        let budgets = [];
+        let currentEditingId = null;
+        let reportsChartInstance = null;
+
+        const initialCategories = [
+            { id: uuidv4(), name: 'Groceries' },
+            { id: uuidv4(), name: 'Utilities' },
+            { id: uuidv4(), name: 'Transport' },
+            { id: uuidv4(), name: 'Entertainment' },
+            { id: uuidv4(), name: 'Healthcare' },
+        ];
+        const initialMembers = [{ id: uuidv4(), name: 'Me' }];
+
+        // --- DOM Elements ---
+        const views = document.querySelectorAll('.view');
+        const navLinks = document.querySelectorAll('.bottom-nav .nav-link');
+        
+        // Expense form elements
+        const expenseModalEl = new bootstrap.Modal(document.getElementById('expenseModal'));
+        const expenseForm = document.getElementById('expenseForm');
+        const expenseIdInput = document.getElementById('expenseId');
+        const expenseAmountInput = document.getElementById('expenseAmount');
+        const expenseCategorySelect = document.getElementById('expenseCategory');
+        const expenseMemberSelect = document.getElementById('expenseMember');
+        const expenseDateInput = document.getElementById('expenseDate');
+        const expenseDescriptionInput = document.getElementById('expenseDescription');
+        const saveExpenseBtn = document.getElementById('saveExpenseBtn');
+
+        // Category form elements
+        const categoryModalEl = new bootstrap.Modal(document.getElementById('categoryModal'));
+        const categoryForm = document.getElementById('categoryForm');
+        const categoryIdInput = document.getElementById('categoryId');
+        const categoryNameInput = document.getElementById('categoryName');
+        const saveCategoryBtn = document.getElementById('saveCategoryBtn');
+
+        // Member form elements
+        const memberModalEl = new bootstrap.Modal(document.getElementById('memberModal'));
+        const memberForm = document.getElementById('memberForm');
+        const memberIdInput = document.getElementById('memberId');
+        const memberNameInput = document.getElementById('memberName');
+        const saveMemberBtn = document.getElementById('saveMemberBtn');
+
+        // Budget form elements
+        const budgetModalEl = new bootstrap.Modal(document.getElementById('budgetModal'));
+        const budgetForm = document.getElementById('budgetForm');
+        const budgetIdInput = document.getElementById('budgetId');
+        const budgetNameInput = document.getElementById('budgetName');
+        const budgetAmountInput = document.getElementById('budgetAmount');
+        const budgetCategorySelect = document.getElementById('budgetCategory');
+        const budgetPeriodSelect = document.getElementById('budgetPeriod');
+        const budgetCustomDateRangeDiv = document.getElementById('budgetCustomDateRange');
+        const budgetStartDateInput = document.getElementById('budgetStartDate');
+        const budgetEndDateInput = document.getElementById('budgetEndDate');
+        const saveBudgetBtn = document.getElementById('saveBudgetBtn');
+        
+        // Confirm Modal Elements
+        const confirmModalEl = new bootstrap.Modal(document.getElementById('confirmModal'));
+        const confirmModalMessageEl = document.getElementById('confirmModalMessage');
+        const confirmModalBtn = document.getElementById('confirmModalBtn');
+        let confirmActionCallback = null;
+
+
+        // --- Utility Functions ---
+        function uuidv4() { // Simple UUID generator
+            return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+            );
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            // Input dateString is expected to be 'YYYY-MM-DD' from date input
+            // For display, we can keep it as is or reformat if needed
+            // Using date-fns for robust parsing and formatting if available globally
+            if (window.dateFns && window.dateFns.isValid(window.dateFns.parseISO(dateString))) {
+                 return window.dateFns.format(window.dateFns.parseISO(dateString), 'yyyy-MM-dd');
+            }
+            return dateString; // Fallback
+        }
+        
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+        }
+
+        function showNotification(message, type = 'success') { // type can be 'success', 'danger', 'warning', 'info'
+            const notificationArea = document.getElementById('notificationArea');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.role = 'alert';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            notificationArea.appendChild(alertDiv);
+            setTimeout(() => {
+                // Ensure alertDiv might still exist if closed manually
+                if (alertDiv.parentNode) {
+                    const bsAlert = bootstrap.Alert.getOrCreateInstance(alertDiv);
+                    if (bsAlert) bsAlert.close();
+                }
+            }, 3000);
+        }
+        
+        function openConfirmationDialog(message, callback) {
+            confirmModalMessageEl.textContent = message;
+            confirmActionCallback = callback;
+            confirmModalEl.show();
+        }
+
+        confirmModalBtn.addEventListener('click', () => {
+            if (typeof confirmActionCallback === 'function') {
+                confirmActionCallback();
+            }
+            confirmModalEl.hide();
+            confirmActionCallback = null;
+        });
+
+
+        // --- Data Persistence (localForage) ---
+        async function saveData(key, data) {
+            try {
+                await localforage.setItem(key, data);
+            } catch (err) {
+                console.error(`Error saving ${key}:`, err);
+                showNotification(`Failed to save ${key}.`, 'danger');
+            }
+        }
+
+        async function loadData() {
+            try {
+                const storedExpenses = await localforage.getItem('expenses');
+                const storedCategories = await localforage.getItem('categories');
+                const storedMembers = await localforage.getItem('members');
+                const storedBudgets = await localforage.getItem('budgets');
+
+                expenses = storedExpenses || [];
+                categories = storedCategories || [...initialCategories]; // Use spread to avoid modifying original
+                members = storedMembers || [...initialMembers];
+                budgets = storedBudgets || [];
+
+                if (!storedCategories || storedCategories.length === 0) {
+                     await saveData('categories', categories);
+                }
+                if (!storedMembers || storedMembers.length === 0) {
+                    await saveData('members', members);
+                }
+
+            } catch (err) {
+                console.error('Error loading data:', err);
+                showNotification('Failed to load data from storage.', 'danger');
+            }
+            // Initial render after loading
+            renderAll();
+        }
+
+        // --- View Switching ---
+        function switchView(viewId) {
+            views.forEach(view => view.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            navLinks.forEach(link => {
+                link.classList.toggle('active', link.dataset.view === viewId);
+            });
+            // Specific actions on view switch
+            if (viewId === 'reportsView') renderReportsView();
+            if (viewId === 'dashboardView') renderDashboard();
+            if (viewId === 'expensesView') renderExpensesView();
+            if (viewId === 'manageView') renderManageView();
+        }
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchView(e.currentTarget.dataset.view);
+            });
+        });
+
+        // --- Render Functions ---
+        function renderAll() {
+            renderDashboard();
+            renderExpensesView();
+            renderManageView();
+            // Reports view is rendered on demand or when switched to
+            populateFilterDropdowns(); // Ensure filters are populated
+        }
+
+        // Dashboard
+        function renderDashboard() {
+            // Total expenses this month
+            const now = new Date();
+            const startOfMonth = window.dateFns.startOfMonth(now);
+            const endOfMonth = window.dateFns.endOfMonth(now);
+            
+            const monthlyExpenses = expenses.filter(exp => {
+                const expDate = window.dateFns.parseISO(exp.date);
+                return window.dateFns.isValid(expDate) && expDate >= startOfMonth && expDate <= endOfMonth;
+            });
+            const totalMonthly = monthlyExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+            document.getElementById('totalExpensesThisMonth').textContent = formatCurrency(totalMonthly);
+
+            // Recent Expenses
+            const recentExpensesList = document.getElementById('recentExpensesList');
+            recentExpensesList.innerHTML = '';
+            const sortedExpenses = [...expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+            
+            if (sortedExpenses.length === 0) {
+                recentExpensesList.innerHTML = '<li class="list-group-item text-muted">No expenses yet.</li>';
+            } else {
+                sortedExpenses.slice(0, 5).forEach(exp => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    li.innerHTML = `
+                        <div>
+                            <span class="fw-medium">${exp.description || getCategoryNameById(exp.categoryId) || 'N/A'}</span>
+                            <small class="d-block text-muted">${getCategoryNameById(exp.categoryId) || 'N/A'} by ${getMemberNameById(exp.memberId) || 'N/A'} on ${formatDate(exp.date)}</small>
+                        </div>
+                        <span class="badge bg-danger rounded-pill">${formatCurrency(exp.amount)}</span>
+                    `;
+                    recentExpensesList.appendChild(li);
+                });
+            }
+            renderActiveBudgetProgress();
+        }
+
+        function renderActiveBudgetProgress() {
+            const activeBudgetNameEl = document.getElementById('activeBudgetName');
+            const activeBudgetAmountEl = document.getElementById('activeBudgetAmount');
+            const activeBudgetProgressEl = document.getElementById('activeBudgetProgress');
+
+            // Simplified: find first monthly budget (overall or first category)
+            const activeBudget = budgets.find(b => b.period === 'monthly' && (b.categoryId === 'all' || categories.some(c => c.id === b.categoryId))) || null;
+
+            if (!activeBudget) {
+                activeBudgetNameEl.textContent = 'No Active Monthly Budget';
+                activeBudgetAmountEl.textContent = 'Target: N/A';
+                activeBudgetProgressEl.style.width = '0%';
+                activeBudgetProgressEl.textContent = '0%';
+                activeBudgetProgressEl.classList.remove('bg-success', 'bg-warning', 'bg-danger');
+                activeBudgetProgressEl.classList.add('bg-secondary');
+                return;
+            }
+
+            activeBudgetNameEl.textContent = activeBudget.name || (activeBudget.categoryId === 'all' ? 'Overall Monthly Budget' : `${getCategoryNameById(activeBudget.categoryId)} Monthly`);
+            activeBudgetAmountEl.textContent = `Target: ${formatCurrency(activeBudget.amount)}`;
+
+            const now = new Date();
+            const budgetStartDate = activeBudget.period === 'custom' && activeBudget.startDate ? window.dateFns.parseISO(activeBudget.startDate) : window.dateFns.startOfMonth(now);
+            const budgetEndDate = activeBudget.period === 'custom' && activeBudget.endDate ? window.dateFns.parseISO(activeBudget.endDate) : window.dateFns.endOfMonth(now);
+
+            const expensesForBudget = expenses.filter(exp => {
+                const expDate = window.dateFns.parseISO(exp.date);
+                if (!window.dateFns.isValid(expDate)) return false;
+                
+                const isWithinPeriod = expDate >= budgetStartDate && expDate <= budgetEndDate;
+                if (!isWithinPeriod) return false;
+                if (activeBudget.categoryId === 'all') return true;
+                return exp.categoryId === activeBudget.categoryId;
+            });
+
+            const totalSpentForBudget = expensesForBudget.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+            const budgetAmountNum = parseFloat(activeBudget.amount);
+            let progressPercent = 0;
+            if (budgetAmountNum > 0) {
+                progressPercent = Math.min((totalSpentForBudget / budgetAmountNum) * 100, 100); // Cap at 100 for display
+            }
+            
+            activeBudgetProgressEl.style.width = `${progressPercent}%`;
+            activeBudgetProgressEl.textContent = `${progressPercent.toFixed(1)}%`;
+            
+            activeBudgetProgressEl.classList.remove('bg-success', 'bg-warning', 'bg-danger', 'bg-secondary');
+            if (totalSpentForBudget > budgetAmountNum) { // Over budget
+                 activeBudgetProgressEl.style.width = `100%`; // Visually show full bar if over
+                 activeBudgetProgressEl.textContent = `${((totalSpentForBudget / budgetAmountNum) * 100).toFixed(1)}% (Over!)`;
+                 activeBudgetProgressEl.classList.add('bg-danger');
+            } else if (progressPercent >= 80) {
+                activeBudgetProgressEl.classList.add('bg-warning');
+            } else {
+                activeBudgetProgressEl.classList.add('bg-success');
+            }
+        }
+
+
+        // Expenses View
+        function renderExpensesView() {
+            const tableBody = document.getElementById('expensesTableBody');
+            const noExpensesMsg = document.getElementById('noExpensesMessage');
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            const searchTerm = document.getElementById('searchTerm').value.toLowerCase();
+            const catFilter = document.getElementById('filterCategory').value;
+            const memFilter = document.getElementById('filterMember').value;
+            const dateStartFilter = document.getElementById('filterDateStart').value;
+            const dateEndFilter = document.getElementById('filterDateEnd').value;
+
+            const filtered = expenses.filter(exp => {
+                const expDate = exp.date ? window.dateFns.parseISO(exp.date) : null;
+                
+                const matchesSearch = searchTerm ? 
+                    (exp.description?.toLowerCase().includes(searchTerm) ||
+                     getCategoryNameById(exp.categoryId)?.toLowerCase().includes(searchTerm) ||
+                     getMemberNameById(exp.memberId)?.toLowerCase().includes(searchTerm) ||
+                     exp.amount.toString().includes(searchTerm)) 
+                    : true;
+                const matchesCategory = catFilter ? exp.categoryId === catFilter : true;
+                const matchesMember = memFilter ? exp.memberId === memFilter : true;
+                
+                let matchesDateStart = true;
+                if (dateStartFilter && expDate && window.dateFns.isValid(expDate)) {
+                    matchesDateStart = expDate >= window.dateFns.parseISO(dateStartFilter);
+                }
+                let matchesDateEnd = true;
+                if (dateEndFilter && expDate && window.dateFns.isValid(expDate)) {
+                    matchesDateEnd = expDate <= window.dateFns.parseISO(dateEndFilter);
+                }
+                return matchesSearch && matchesCategory && matchesMember && matchesDateStart && matchesDateEnd;
+            }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+
+            if (filtered.length === 0) {
+                noExpensesMsg.style.display = 'block';
+            } else {
+                noExpensesMsg.style.display = 'none';
+                filtered.forEach(exp => {
+                    const row = tableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${formatDate(exp.date)}</td>
+                        <td>${exp.description || '-'}</td>
+                        <td>${getCategoryNameById(exp.categoryId) || 'N/A'}</td>
+                        <td>${getMemberNameById(exp.memberId) || 'N/A'}</td>
+                        <td class="text-end">${formatCurrency(exp.amount)}</td>
+                        <td class="text-center">
+                            <button class="btn btn-outline-primary btn-sm py-0 px-1 me-1" onclick="editExpense('${exp.id}')"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteExpense('${exp.id}')"><i class="fas fa-trash"></i></button>
+                        </td>
+                    `;
+                });
+            }
+        }
+        
+        function populateFilterDropdowns() {
+            const catFilterSelect = document.getElementById('filterCategory');
+            const memFilterSelect = document.getElementById('filterMember');
+
+            catFilterSelect.innerHTML = '<option value="">All Categories</option>';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                catFilterSelect.appendChild(option);
+            });
+
+            memFilterSelect.innerHTML = '<option value="">All Members</option>';
+            members.forEach(mem => {
+                const option = document.createElement('option');
+                option.value = mem.id;
+                option.textContent = mem.name;
+                memFilterSelect.appendChild(option);
+            });
+        }
+
+        document.getElementById('toggleFiltersBtn').addEventListener('click', () => {
+            const filtersContainer = document.getElementById('filtersContainer');
+            const btn = document.getElementById('toggleFiltersBtn');
+            if (filtersContainer.style.display === 'none') {
+                filtersContainer.style.display = 'block';
+                btn.innerHTML = '<i class="fas fa-filter me-1"></i> Hide Filters';
+            } else {
+                filtersContainer.style.display = 'none';
+                btn.innerHTML = '<i class="fas fa-filter me-1"></i> Show Filters';
+            }
+        });
+        document.getElementById('searchTerm').addEventListener('input', renderExpensesView);
+        document.getElementById('filterCategory').addEventListener('change', renderExpensesView);
+        document.getElementById('filterMember').addEventListener('change', renderExpensesView);
+        document.getElementById('filterDateStart').addEventListener('change', renderExpensesView);
+        document.getElementById('filterDateEnd').addEventListener('change', renderExpensesView);
+        document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+            document.getElementById('searchTerm').value = '';
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterMember').value = '';
+            document.getElementById('filterDateStart').value = '';
+            document.getElementById('filterDateEnd').value = '';
+            renderExpensesView();
+        });
+
+
+        // Manage View (Categories, Members, Budgets)
+        function renderManageView() {
+            renderCategoriesList();
+            renderMembersList();
+            renderBudgetsList();
+        }
+
+        function getCategoryNameById(id) {
+            const category = categories.find(cat => cat.id === id);
+            return category ? category.name : 'N/A';
+        }
+
+        function getMemberNameById(id) {
+            const member = members.find(mem => mem.id === id);
+            return member ? member.name : 'N/A';
+        }
+
+        // --- CRUD Operations & Modal Handling ---
+        // Expenses
+        function prepareExpenseModal(id = null) {
+            expenseForm.classList.remove('was-validated');
+            expenseForm.reset(); // Reset form for new entry or edit
+            populateDropdown(expenseCategorySelect, categories, 'Select Category');
+            populateDropdown(expenseMemberSelect, members, 'Select Member');
+            
+            if (id) { // Editing existing expense
+                currentEditingId = id;
+                const expense = expenses.find(exp => exp.id === id);
+                if (expense) {
+                    document.getElementById('expenseModalLabel').textContent = 'Edit Expense';
+                    expenseIdInput.value = expense.id;
+                    expenseAmountInput.value = expense.amount;
+                    expenseCategorySelect.value = expense.categoryId;
+                    expenseMemberSelect.value = expense.memberId;
+                    expenseDateInput.value = expense.date; // Assumes YYYY-MM-DD
+                    expenseDescriptionInput.value = expense.description || '';
+                }
+            } else { // Adding new expense
+                currentEditingId = null;
+                document.getElementById('expenseModalLabel').textContent = 'Add Expense';
+                expenseIdInput.value = ''; // Clear ID for new
+                expenseDateInput.value = formatDate(new Date().toISOString().split('T')[0]); // Default to today
+            }
+        }
+        
+        saveExpenseBtn.addEventListener('click', async () => {
+            if (!expenseForm.checkValidity()) {
+                expenseForm.classList.add('was-validated');
+                return;
+            }
+            const expenseData = {
+                id: currentEditingId || uuidv4(),
+                amount: parseFloat(expenseAmountInput.value),
+                categoryId: expenseCategorySelect.value,
+                memberId: expenseMemberSelect.value,
+                date: expenseDateInput.value,
+                description: expenseDescriptionInput.value.trim()
+            };
+
+            if (currentEditingId) { // Update
+                expenses = expenses.map(exp => exp.id === currentEditingId ? expenseData : exp);
+                showNotification('Expense updated successfully!', 'success');
+            } else { // Add
+                expenses.push(expenseData);
+                showNotification('Expense added successfully!', 'success');
+            }
+            await saveData('expenses', expenses);
+            renderAll(); // Re-render relevant parts
+            expenseModalEl.hide();
+        });
+
+        window.editExpense = (id) => { // Make it globally accessible for inline onclick
+            prepareExpenseModal(id);
+            expenseModalEl.show();
+        };
+
+        window.deleteExpense = (id) => {
+            openConfirmationDialog('Are you sure you want to delete this expense?', async () => {
+                expenses = expenses.filter(exp => exp.id !== id);
+                await saveData('expenses', expenses);
+                renderAll();
+                showNotification('Expense deleted!', 'info');
+            });
+        };
+
+
+        // Categories
+        function renderCategoriesList() {
+            const listEl = document.getElementById('categoriesList');
+            listEl.innerHTML = '';
+            if (categories.length === 0) {
+                listEl.innerHTML = '<li class="list-group-item text-muted">No categories defined.</li>';
+                return;
+            }
+            categories.forEach(cat => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                li.innerHTML = `
+                    <span>${cat.name}</span>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm py-0 px-1 me-1" onclick="editCategory('${cat.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteCategory('${cat.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                listEl.appendChild(li);
+            });
+        }
+        function prepareCategoryModal(id = null) {
+            categoryForm.classList.remove('was-validated');
+            categoryForm.reset();
+            if (id) {
+                currentEditingId = id;
+                const category = categories.find(cat => cat.id === id);
+                document.getElementById('categoryModalLabel').textContent = 'Edit Category';
+                categoryIdInput.value = category.id;
+                categoryNameInput.value = category.name;
+            } else {
+                currentEditingId = null;
+                document.getElementById('categoryModalLabel').textContent = 'Add Category';
+                categoryIdInput.value = '';
+            }
+        }
+        saveCategoryBtn.addEventListener('click', async () => {
+            if (!categoryForm.checkValidity()) {
+                categoryForm.classList.add('was-validated');
+                return;
+            }
+            const categoryData = {
+                id: currentEditingId || uuidv4(),
+                name: categoryNameInput.value.trim()
+            };
+            if (categories.some(c => c.name.toLowerCase() === categoryData.name.toLowerCase() && c.id !== categoryData.id)) {
+                showNotification('A category with this name already exists.', 'warning');
+                categoryNameInput.classList.add('is-invalid');
+                categoryNameInput.focus();
+                return;
+            }
+            categoryNameInput.classList.remove('is-invalid');
+
+            if (currentEditingId) {
+                categories = categories.map(cat => cat.id === currentEditingId ? categoryData : cat);
+                showNotification('Category updated!', 'success');
+            } else {
+                categories.push(categoryData);
+                showNotification('Category added!', 'success');
+            }
+            await saveData('categories', categories);
+            renderManageView();
+            populateDropdown(expenseCategorySelect, categories, 'Select Category'); // Update expense form dropdown
+            populateDropdown(document.getElementById('budgetCategory'), categories, 'Select Category', true); // Update budget form dropdown (allow 'all')
+            populateFilterDropdowns();
+            categoryModalEl.hide();
+        });
+        window.editCategory = (id) => { prepareCategoryModal(id); categoryModalEl.show(); };
+        window.deleteCategory = (id) => {
+            if (expenses.some(exp => exp.categoryId === id)) {
+                showNotification('Cannot delete category. It is used in expenses.', 'danger');
+                return;
+            }
+             if (budgets.some(b => b.categoryId === id)) {
+                showNotification('Cannot delete category. It is used in budgets.', 'danger');
+                return;
+            }
+            openConfirmationDialog('Are you sure you want to delete this category?', async () => {
+                categories = categories.filter(cat => cat.id !== id);
+                await saveData('categories', categories);
+                renderManageView();
+                populateDropdown(expenseCategorySelect, categories, 'Select Category');
+                populateDropdown(document.getElementById('budgetCategory'), categories, 'Select Category', true);
+                populateFilterDropdowns();
+                showNotification('Category deleted.', 'info');
+            });
+        };
+
+        // Members
+        function renderMembersList() {
+            const listEl = document.getElementById('membersList');
+            listEl.innerHTML = '';
+             if (members.length === 0) {
+                listEl.innerHTML = '<li class="list-group-item text-muted">No members defined.</li>';
+                return;
+            }
+            members.forEach(mem => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                li.innerHTML = `
+                    <span>${mem.name}</span>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm py-0 px-1 me-1" onclick="editMember('${mem.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteMember('${mem.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                listEl.appendChild(li);
+            });
+        }
+        function prepareMemberModal(id = null) {
+            memberForm.classList.remove('was-validated');
+            memberForm.reset();
+            if (id) {
+                currentEditingId = id;
+                const member = members.find(mem => mem.id === id);
+                document.getElementById('memberModalLabel').textContent = 'Edit Member';
+                memberIdInput.value = member.id;
+                memberNameInput.value = member.name;
+            } else {
+                currentEditingId = null;
+                document.getElementById('memberModalLabel').textContent = 'Add Member';
+                memberIdInput.value = '';
+            }
+        }
+        saveMemberBtn.addEventListener('click', async () => {
+            if (!memberForm.checkValidity()) {
+                memberForm.classList.add('was-validated');
+                return;
+            }
+            const memberData = {
+                id: currentEditingId || uuidv4(),
+                name: memberNameInput.value.trim()
+            };
+             if (members.some(m => m.name.toLowerCase() === memberData.name.toLowerCase() && m.id !== memberData.id)) {
+                showNotification('A member with this name already exists.', 'warning');
+                memberNameInput.classList.add('is-invalid');
+                memberNameInput.focus();
+                return;
+            }
+            memberNameInput.classList.remove('is-invalid');
+
+            if (currentEditingId) {
+                members = members.map(mem => mem.id === currentEditingId ? memberData : mem);
+                 showNotification('Member updated!', 'success');
+            } else {
+                members.push(memberData);
+                showNotification('Member added!', 'success');
+            }
+            await saveData('members', members);
+            renderManageView();
+            populateDropdown(expenseMemberSelect, members, 'Select Member');
+            populateFilterDropdowns();
+            memberModalEl.hide();
+        });
+        window.editMember = (id) => { prepareMemberModal(id); memberModalEl.show(); };
+        window.deleteMember = (id) => {
+            if (expenses.some(exp => exp.memberId === id)) {
+                showNotification('Cannot delete member. They are associated with expenses.', 'danger');
+                return;
+            }
+            openConfirmationDialog('Are you sure you want to delete this member?', async () => {
+                members = members.filter(mem => mem.id !== id);
+                await saveData('members', members);
+                renderManageView();
+                populateDropdown(expenseMemberSelect, members, 'Select Member');
+                populateFilterDropdowns();
+                showNotification('Member deleted.', 'info');
+            });
+        };
+
+        // Budgets
+        function renderBudgetsList() {
+            const listEl = document.getElementById('budgetsList');
+            listEl.innerHTML = '';
+            if (budgets.length === 0) {
+                listEl.innerHTML = '<li class="list-group-item text-muted">No budgets set.</li>';
+                return;
+            }
+            budgets.forEach(b => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                const categoryName = b.categoryId === 'all' ? 'Overall' : getCategoryNameById(b.categoryId);
+                const budgetTitle = b.name || `${categoryName} Budget`;
+                let periodDetails = `per ${b.period}`;
+                if (b.period === 'custom' && b.startDate && b.endDate) {
+                    periodDetails += ` (${formatDate(b.startDate)} - ${formatDate(b.endDate)})`;
+                }
+
+                li.innerHTML = `
+                    <div>
+                        <span class="fw-medium">${budgetTitle}</span>
+                        <small class="d-block text-muted">${formatCurrency(b.amount)} ${periodDetails}</small>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm py-0 px-1 me-1" onclick="editBudget('${b.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteBudget('${b.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                listEl.appendChild(li);
+            });
+        }
+        budgetPeriodSelect.addEventListener('change', (e) => {
+            budgetCustomDateRangeDiv.style.display = e.target.value === 'custom' ? 'flex' : 'none';
+        });
+        function prepareBudgetModal(id = null) {
+            budgetForm.classList.remove('was-validated');
+            budgetForm.reset();
+            populateDropdown(budgetCategorySelect, categories, 'Select Category', true); // true for allowAllOption
+            
+            budgetCustomDateRangeDiv.style.display = 'none'; // Reset custom date display
+            budgetPeriodSelect.value = 'monthly'; // Default
+
+            if (id) {
+                currentEditingId = id;
+                const budget = budgets.find(b => b.id === id);
+                document.getElementById('budgetModalLabel').textContent = 'Edit Budget';
+                budgetIdInput.value = budget.id;
+                budgetNameInput.value = budget.name || '';
+                budgetAmountInput.value = budget.amount;
+                budgetCategorySelect.value = budget.categoryId;
+                budgetPeriodSelect.value = budget.period;
+                if (budget.period === 'custom') {
+                    budgetCustomDateRangeDiv.style.display = 'flex';
+                    budgetStartDateInput.value = budget.startDate || '';
+                    budgetEndDateInput.value = budget.endDate || '';
+                }
+            } else {
+                currentEditingId = null;
+                document.getElementById('budgetModalLabel').textContent = 'Add Budget';
+                budgetIdInput.value = '';
+            }
+        }
+        saveBudgetBtn.addEventListener('click', async () => {
+            if (!budgetForm.checkValidity()) {
+                 // Custom validation for custom date range if period is 'custom'
+                if (budgetPeriodSelect.value === 'custom') {
+                    if (!budgetStartDateInput.value) budgetStartDateInput.classList.add('is-invalid'); else budgetStartDateInput.classList.remove('is-invalid');
+                    if (!budgetEndDateInput.value) budgetEndDateInput.classList.add('is-invalid'); else budgetEndDateInput.classList.remove('is-invalid');
+                    if (!budgetStartDateInput.value || !budgetEndDateInput.value) {
+                         budgetForm.classList.add('was-validated'); // Trigger other Bootstrap validations
+                         return;
+                    }
+                     if (window.dateFns.parseISO(budgetStartDateInput.value) > window.dateFns.parseISO(budgetEndDateInput.value)) {
+                        budgetEndDateInput.classList.add('is-invalid');
+                        budgetEndDateInput.nextElementSibling.textContent = 'End date must be after start date.'; // Assuming invalid-feedback div exists
+                        budgetForm.classList.add('was-validated');
+                        return;
+                    } else {
+                        budgetEndDateInput.classList.remove('is-invalid');
+                    }
+                }
+                budgetForm.classList.add('was-validated');
+                return;
+            }
+
+            const budgetData = {
+                id: currentEditingId || uuidv4(),
+                name: budgetNameInput.value.trim(),
+                amount: parseFloat(budgetAmountInput.value),
+                categoryId: budgetCategorySelect.value,
+                period: budgetPeriodSelect.value,
+                startDate: budgetPeriodSelect.value === 'custom' ? budgetStartDateInput.value : null,
+                endDate: budgetPeriodSelect.value === 'custom' ? budgetEndDateInput.value : null,
+            };
+
+            if (currentEditingId) {
+                budgets = budgets.map(b => b.id === currentEditingId ? budgetData : b);
+                showNotification('Budget updated!', 'success');
+            } else {
+                budgets.push(budgetData);
+                showNotification('Budget added!', 'success');
+            }
+            await saveData('budgets', budgets);
+            renderManageView();
+            renderDashboard(); // Update dashboard budget display
+            budgetModalEl.hide();
+        });
+        window.editBudget = (id) => { prepareBudgetModal(id); budgetModalEl.show(); };
+        window.deleteBudget = (id) => {
+            openConfirmationDialog('Are you sure you want to delete this budget?', async () => {
+                budgets = budgets.filter(b => b.id !== id);
+                await saveData('budgets', budgets);
+                renderManageView();
+                renderDashboard();
+                showNotification('Budget deleted.', 'info');
+            });
+        };
+
+
+        // Helper to populate select dropdowns
+        function populateDropdown(selectElement, items, defaultOptionText, allowAllOption = false) {
+            selectElement.innerHTML = ''; // Clear existing
+            if (defaultOptionText) {
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.textContent = defaultOptionText;
+                defaultOpt.disabled = true;
+                defaultOpt.selected = true;
+                selectElement.appendChild(defaultOpt);
+            }
+            if (allowAllOption && selectElement.id === 'budgetCategory') { // Specific for budget category
+                 const allOpt = document.createElement('option');
+                 allOpt.value = 'all';
+                 allOpt.textContent = 'Overall (All Categories)';
+                 selectElement.appendChild(allOpt);
+            }
+            items.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name;
+                selectElement.appendChild(option);
+            });
+        }
+
+        // --- Reports View ---
+        const reportTypeSelect = document.getElementById('reportType');
+        const reportTimePeriodSelect = document.getElementById('reportTimePeriod');
+        const reportCustomDateRangeDiv = document.getElementById('reportCustomDateRange');
+        const reportStartDateInput = document.getElementById('reportStartDate');
+        const reportEndDateInput = document.getElementById('reportEndDate');
+        const noReportDataMessageEl = document.getElementById('noReportDataMessage');
+
+
+        reportTimePeriodSelect.addEventListener('change', (e) => {
+            reportCustomDateRangeDiv.style.display = e.target.value === 'custom' ? 'flex' : 'none';
+            renderReportsView();
+        });
+        reportTypeSelect.addEventListener('change', renderReportsView);
+        reportStartDateInput.addEventListener('change', renderReportsView);
+        reportEndDateInput.addEventListener('change', renderReportsView);
+
+
+        function renderReportsView() {
+            const ctx = document.getElementById('reportsChart').getContext('2d');
+            const type = reportTypeSelect.value;
+            const period = reportTimePeriodSelect.value;
+            const customStart = reportStartDateInput.value;
+            const customEnd = reportEndDateInput.value;
+
+            let startDate, endDate;
+            const today = new Date();
+
+            switch (period) {
+                case 'this_week':
+                    startDate = window.dateFns.startOfWeek(today, { weekStartsOn: 1 });
+                    endDate = window.dateFns.endOfWeek(today, { weekStartsOn: 1 });
+                    break;
+                case 'last_week':
+                    startDate = window.dateFns.startOfWeek(window.dateFns.subWeeks(today, 1), { weekStartsOn: 1 });
+                    endDate = window.dateFns.endOfWeek(window.dateFns.subWeeks(today, 1), { weekStartsOn: 1 });
+                    break;
+                case 'this_month':
+                    startDate = window.dateFns.startOfMonth(today);
+                    endDate = window.dateFns.endOfMonth(today);
+                    break;
+                case 'last_month':
+                    startDate = window.dateFns.startOfMonth(window.dateFns.subMonths(today, 1));
+                    endDate = window.dateFns.endOfMonth(window.dateFns.subMonths(today, 1));
+                    break;
+                case 'this_year':
+                    startDate = window.dateFns.startOfYear(today);
+                    endDate = window.dateFns.endOfYear(today);
+                    break;
+                case 'last_year':
+                    startDate = window.dateFns.startOfYear(window.dateFns.subYears(today, 1));
+                    endDate = window.dateFns.endOfYear(window.dateFns.subYears(today, 1));
+                    break;
+                case 'custom':
+                    startDate = customStart ? window.dateFns.parseISO(customStart) : null;
+                    endDate = customEnd ? window.dateFns.parseISO(customEnd) : null;
+                    if (startDate && endDate && window.dateFns.isValid(startDate) && window.dateFns.isValid(endDate) && startDate > endDate) {
+                        showNotification("End date must be after start date for custom report range.", "warning");
+                        noReportDataMessageEl.style.display = 'block';
+                        if (reportsChartInstance) reportsChartInstance.destroy();
+                        return;
+                    }
+                    break;
+                default: // Default to this month
+                    startDate = window.dateFns.startOfMonth(today);
+                    endDate = window.dateFns.endOfMonth(today);
+            }
+            
+            const filteredReportExpenses = expenses.filter(exp => {
+                const expDate = window.dateFns.parseISO(exp.date);
+                if (!window.dateFns.isValid(expDate)) return false;
+                if (startDate && endDate && window.dateFns.isValid(startDate) && window.dateFns.isValid(endDate)) {
+                    return expDate >= startDate && expDate <= endDate;
+                }
+                if (startDate && window.dateFns.isValid(startDate)) return expDate >= startDate;
+                if (endDate && window.dateFns.isValid(endDate)) return expDate <= endDate;
+                if (!startDate && !endDate && period !== 'custom') return true; // For non-custom periods if somehow dates are null
+                return false; // If custom and dates are not valid/set
+            });
+
+            if (reportsChartInstance) {
+                reportsChartInstance.destroy();
+            }
+
+            let chartData = {};
+            let chartType = 'pie'; // Default
+            let chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' }, title: { display: true, text: 'Report' } }
+            };
+
+            if (filteredReportExpenses.length === 0) {
+                 noReportDataMessageEl.style.display = 'block';
+                 document.getElementById('chartContainerWrapper').style.display = 'none';
+                 return;
+            }
+            noReportDataMessageEl.style.display = 'none';
+            document.getElementById('chartContainerWrapper').style.display = 'block';
+
+
+            if (type === 'category') {
+                chartType = 'pie';
+                const dataByCat = categories.map(cat => ({
+                    name: cat.name,
+                    total: filteredReportExpenses
+                        .filter(exp => exp.categoryId === cat.id)
+                        .reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0)
+                })).filter(c => c.total > 0);
+                
+                chartData = {
+                    labels: dataByCat.map(c => c.name),
+                    datasets: [{
+                        label: 'Expenses by Category',
+                        data: dataByCat.map(c => c.total),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#7A4EFE', '#FEA82F'],
+                    }]
+                };
+                chartOptions.plugins.title.text = 'Expenses by Category';
+            } else if (type === 'member') {
+                chartType = 'bar';
+                const dataByMem = members.map(mem => ({
+                    name: mem.name,
+                    total: filteredReportExpenses
+                        .filter(exp => exp.memberId === mem.id)
+                        .reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0)
+                })).filter(m => m.total > 0);
+                chartData = {
+                    labels: dataByMem.map(m => m.name),
+                    datasets: [{
+                        label: 'Expenses by Member',
+                        data: dataByMem.map(m => m.total),
+                        backgroundColor: '#36A2EB',
+                    }]
+                };
+                chartOptions.plugins.title.text = 'Expenses by Member';
+            } else if (type === 'time_trend') {
+                chartType = 'line';
+                if (!startDate || !endDate || !window.dateFns.isValid(startDate) || !window.dateFns.isValid(endDate) || startDate > endDate) {
+                     noReportDataMessageEl.style.display = 'block';
+                     document.getElementById('chartContainerWrapper').style.display = 'none';
+                     return; // Need valid date range for time trend
+                }
+
+                const daysInRange = window.dateFns.eachDayOfInterval({ start: startDate, end: endDate });
+                const dailyTotals = daysInRange.map(day => {
+                    const total = filteredReportExpenses
+                        .filter(exp => window.dateFns.format(window.dateFns.parseISO(exp.date), 'yyyy-MM-dd') === window.dateFns.format(day, 'yyyy-MM-dd'))
+                        .reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+                    return { date: day, total };
+                });
+
+                chartData = {
+                    labels: dailyTotals.map(d => d.date),
+                    datasets: [{
+                        label: 'Daily Spending Trend',
+                        data: dailyTotals.map(d => d.total),
+                        borderColor: '#4BC0C0',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true,
+                        tension: 0.1
+                    }]
+                };
+                chartOptions.plugins.title.text = 'Spending Trend';
+                chartOptions.scales = {
+                    x: { type: 'time', time: { unit: window.dateFns.differenceInDays(endDate, startDate) > 90 ? 'month' : 'day' } },
+                    y: { beginAtZero: true }
+                };
+            }
+            
+            if (Object.keys(chartData).length > 0 && chartData.labels && chartData.labels.length > 0) {
+                 reportsChartInstance = new Chart(ctx, { type: chartType, data: chartData, options: chartOptions });
+            } else {
+                 noReportDataMessageEl.style.display = 'block';
+                 document.getElementById('chartContainerWrapper').style.display = 'none';
+            }
+        }
+
+
+        // --- Settings (Import/Export) ---
+        document.getElementById('exportDataBtn').addEventListener('click', () => {
+            const dataToExport = { expenses, categories, members, budgets, exportedAt: new Date().toISOString() };
+            const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(dataToExport, null, 2))}`;
+            const link = document.createElement("a");
+            link.href = jsonString;
+            link.download = `budget_app_data_${window.dateFns.format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
+            link.click();
+            showNotification('Data exported successfully!', 'success');
+        });
+
+        document.getElementById('importDataBtn').addEventListener('click', () => {
+            const fileInput = document.getElementById('importFile');
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        
+                        const mergeItems = (existing, newItems, itemName) => {
+                            if (!Array.isArray(newItems)) {
+                                console.warn(`Imported ${itemName} is not an array.`);
+                                return existing;
+                            }
+                            const existingIds = new Set(existing.map(item => item.id));
+                            const itemsToAdd = newItems.filter(item => item && item.id && !existingIds.has(item.id));
+                            return [...existing, ...itemsToAdd];
+                        };
+
+                        if (imported.expenses) expenses = mergeItems(expenses, imported.expenses, 'expenses');
+                        if (imported.categories) categories = mergeItems(categories, imported.categories, 'categories');
+                        if (imported.members) members = mergeItems(members, imported.members, 'members');
+                        if (imported.budgets) budgets = mergeItems(budgets, imported.budgets, 'budgets');
+
+                        await Promise.all([
+                            saveData('expenses', expenses),
+                            saveData('categories', categories),
+                            saveData('members', members),
+                            saveData('budgets', budgets)
+                        ]);
+                        loadData(); // Reload and re-render all
+                        showNotification('Data imported successfully!', 'success');
+                    } catch (error) {
+                        console.error("Failed to import data", error);
+                        showNotification('Error importing data. File might be invalid.', 'danger');
+                    }
+                };
+                reader.readAsText(file);
+                fileInput.value = null; // Reset file input
+            } else {
+                showNotification('Please select a file to import.', 'warning');
+            }
+        });
+
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set default date for report custom range
+            reportStartDateInput.value = window.dateFns.format(window.dateFns.startOfMonth(new Date()), 'yyyy-MM-dd');
+            reportEndDateInput.value = window.dateFns.format(window.dateFns.endOfMonth(new Date()), 'yyyy-MM-dd');
+            
+            loadData().then(() => {
+                switchView('dashboardView'); // Start with dashboard
+                // Ensure dropdowns are populated after data load for modals
+                populateDropdown(expenseCategorySelect, categories, 'Select Category');
+                populateDropdown(expenseMemberSelect, members, 'Select Member');
+                populateDropdown(budgetCategorySelect, categories, 'Select Category', true);
+            });
+        });
+let deferredPrompt;
+const installBtn = document.getElementById('installBtn');
+
+// Listen for install prompt
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'block'; // Show install button
+});
+
+// Handle install button click
+installBtn.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const result = await deferredPrompt.userChoice;
+    if (result.outcome === 'accepted') {
+      console.log('User installed the app');
+    }
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+  }
+});
+
+// Hide button after successful install
+window.addEventListener('appinstalled', () => {
+  installBtn.style.display = 'none';
+  console.log('PWA was installed');
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(() => console.log('SW registered'))
+    .catch((error) => console.log('SW registration failed:', error));
+}
+    </script>
+
+</body>
+</html>
